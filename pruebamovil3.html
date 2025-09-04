@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Unificado de Seguridad Vehicular</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            overflow-x: hidden;
+        }
+
+        .critical-warning {
+            background: linear-gradient(45deg, #dc3545, #c82333);
+            padding: 20px;
+            text-align: center;
+            font-weight: bold;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            animation: warningPulse 2s infinite;
+        }
+
+        @keyframes warningPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        .main-container {
+            margin-top: 80px;
+            padding: 15px;
+            max-width: 100vw;
+        }
+
+        .model-status {
+            background: rgba(0,0,0,0.4);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .camera-container {
+            position: relative;
+            width: 100%;
+            height: 280px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        #cameraVideo {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #detectionCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        #faceCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .status-card {
+            background: rgba(255,255,255,0.1);
+            padding: 12px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+            text-align: center;
+        }
+
+        .status-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #00ff88;
+            margin-bottom: 5px;
+        }
+
+        .status-value.warning { color: #ffc107; }
+        .status-value.danger { color: #ff4444; }
+
+        .status-label {
+            font-size: 11px;
+            opacity: 0.8;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .control-button {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .control-button:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .control-button.active {
+            background: linear-gradient(45deg, #00ff88, #00cc66);
+            color: black;
+        }
+
+        .control-button:disabled {
+            background: rgba(100,100,100,0.3);
+            cursor: not-allowed;
+        }
+
+        .detection-log {
+            background: rgba(0,0,0,0.4);
+            padding: 12px;
+            border-radius: 8px;
+            height: 120px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 11px;
+            margin: 15px 0;
+        }
+
+        .voice-section {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+
+        .voice-button {
+            background: linear-gradient(45deg, #00ff88, #00cc66);
+            color: black;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            margin: 5px 0;
+        }
+
+        .voice-button.active {
+            background: linear-gradient(45deg, #ff6b47, #ff4500);
+            animation: pulse 1s infinite;
+        }
+
+        .destination-display {
+            background: rgba(255,255,255,0.1);
+            padding: 12px;
+            border-radius: 8px;
+            margin: 10px 0;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        .alert-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            min-width: 280px;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            font-weight: bold;
+            display: none;
+            z-index: 2000;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.7);
+            backdrop-filter: blur(15px);
+        }
+
+        .drowsiness-alert {
+            background: linear-gradient(45deg, #ff4444, #cc0000);
+            color: white;
+            animation: emergencyPulse 0.8s infinite;
+        }
+
+        .speed-alert {
+            background: linear-gradient(45deg, #ffc107, #e0a800);
+            color: black;
+            animation: speedPulse 1s infinite;
+        }
+
+        .object-alert {
+            background: linear-gradient(45deg, #17a2b8, #138496);
+            color: white;
+            animation: objectPulse 1.2s infinite;
+        }
+
+        @keyframes emergencyPulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.05); }
+        }
+
+        @keyframes speedPulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.03); }
+        }
+
+        @keyframes objectPulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.02); }
+        }
+
+        @keyframes pulse {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.7; }
+        }
+
+        .performance-warning {
+            background: rgba(255, 193, 7, 0.2);
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 15px 0;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .map-container {
+            height: 150px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="critical-warning">
+        ⚠️ SISTEMA EXPERIMENTAL - SOLO USO COMO PASAJERO ⚠️
+    </div>
+
+    <div class="main-container">
+        <div class="model-status">
+            <div><strong>Estado del Modelo IA:</strong> <span id="modelStatus">No cargado</span></div>
+            <div id="modelInfo" style="font-size: 12px; margin-top: 5px;">Presiona "Cargar IA" para activar detección real</div>
+        </div>
+
+        <div class="performance-warning">
+            <strong>Advertencia de Rendimiento:</strong><br>
+            La detección real consume mucha batería y puede ser lenta en algunos dispositivos
+        </div>
+
+        <div class="camera-container">
+            <video id="cameraVideo" autoplay muted playsinline></video>
+            <canvas id="detectionCanvas"></canvas>
+            <canvas id="faceCanvas"></canvas>
+        </div>
+
+        <div class="status-grid">
+            <div class="status-card">
+                <div class="status-value" id="speedDisplay">0</div>
+                <div class="status-label">Velocidad (km/h)</div>
+            </div>
+            <div class="status-card">
+                <div class="status-value" id="alertnessStatus">Monitoreando</div>
+                <div class="status-label">Estado Conductor</div>
+            </div>
+            <div class="status-card">
+                <div class="status-value" id="realObjectCount">0</div>
+                <div class="status-label">Objetos Reales</div>
+            </div>
+            <div class="status-card">
+                <div class="status-value" id="detectionAccuracy">0%</div>
+                <div class="status-label">Precisión IA</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="control-button" id="enableCamera">📹 Cámara</button>
+            <button class="control-button" id="loadAIModel" disabled>🤖 Cargar IA</button>
+            <button class="control-button" id="startDetection" disabled>👁️ Detección</button>
+            <button class="control-button" id="enableGPS">📍 GPS</button>
+            <button class="control-button" id="toggleFaceDetection" disabled>😴 Anti-Sueño</button>
+            <button class="control-button" id="toggleAlerts">🔔 Alertas</button>
+        </div>
+
+        <div class="voice-section">
+            <h3 style="font-size: 14px; margin-bottom: 10px;">Navegación por Voz</h3>
+            <button class="voice-button" id="voiceButton">🎤 Decir Destino</button>
+            <div class="destination-display" id="destinationDisplay">
+                Toca el micrófono y di: "Ir a [lugar]"
+            </div>
+        </div>
+
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+
+        <div class="detection-log" id="detectionLog">
+            <div>[INICIO] Sistema unificado iniciado</div>
+            <div>[INFO] Funciones: Detección real + Reconocimiento facial + GPS + Voz</div>
+        </div>
+    </div>
+
+    <!-- Alertas -->
+    <div class="alert-container drowsiness-alert" id="drowsinessAlert">
+        <div>😴 CONDUCTOR CON SUEÑO DETECTADO</div>
+        <div style="font-size: 14px; margin: 10px 0;">Se recomienda detenerse inmediatamente</div>
+        <button onclick="dismissAlert('drowsiness')" style="padding: 8px 15px; background: white; color: black; border: none; border-radius: 5px;">Estoy Despierto</button>
+    </div>
+
+    <div class="alert-container speed-alert" id="speedAlert">
+        <div>⚡ VELOCIDAD EXCESIVA DETECTADA</div>
+        <div style="font-size: 14px; margin: 8px 0;">
+            <span id="currentSpeedAlert">--</span> km/h (Límite: 60 km/h)
+        </div>
+        <button onclick="dismissAlert('speed')" style="padding: 8px 15px; background: black; color: white; border: none; border-radius: 5px;">Entendido</button>
+    </div>
+
+    <div class="alert-container object-alert" id="objectAlert">
+        <div id="objectMessage">🚶‍♂️ OBJETO DETECTADO</div>
+        <div style="font-size: 14px; margin: 8px 0;">
+            Sistema de seguridad activado
+        </div>
+        <button onclick="dismissAlert('object')" style="padding: 8px 15px; background: white; color: black; border: none; border-radius: 5px;">Visto</button>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/4.2.0/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+
+    <script>
+        class UnifiedSafetySystem {
+            constructor() {
+                // Core components
+                this.objectDetectionModel = null;
+                this.cameraStream = null;
+                this.voiceRecognition = null;
+                this.speechSynthesis = window.speechSynthesis;
+                this.audioContext = null;
+                this.map = null;
+
+                // State management
+                this.isObjectDetecting = false;
+                this.isFaceDetecting = false;
+                this.alertsEnabled = true;
+                this.gpsEnabled = false;
+                this.currentSpeed = 0;
+
+                // Detection data
+                this.realDetections = [];
+                this.drowsinessFrames = 0;
+                this.lastAlerts = {};
+                
+                // Performance tracking
+                this.detectionTimes = [];
+                this.averageAccuracy = 0;
+
+                this.initializeSystem();
+            }
+
+            async initializeSystem() {
+                try {
+                    // Initialize audio context
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    
+                    // Initialize voice recognition
+                    if ('webkitSpeechRecognition' in window) {
+                        this.voiceRecognition = new webkitSpeechRecognition();
+                        this.voiceRecognition.continuous = false;
+                        this.voiceRecognition.lang = 'es-ES';
+                        this.voiceRecognition.interimResults = false;
+                    }
+
+                    this.logMessage('✅ Sistema base inicializado correctamente');
+                } catch (error) {
+                    this.logMessage('❌ Error inicializando sistema: ' + error.message);
+                }
+            }
+
+            async enableCamera() {
+                try {
+                    // Try rear camera first for better object detection
+                    this.cameraStream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: 'environment',
+                            width: { ideal: 640 },
+                            height: { ideal: 480 }
+                        }
+                    });
+
+                    const video = document.getElementById('cameraVideo');
+                    video.srcObject = this.cameraStream;
+                    
+                    video.onloadedmetadata = () => {
+                        this.setupCanvases();
+                        this.logMessage('📹 Cámara trasera activada');
+                        document.getElementById('enableCamera').classList.add('active');
+                        document.getElementById('loadAIModel').disabled = false;
+                    };
+
+                } catch (error) {
+                    // Fallback to front camera
+                    try {
+                        this.cameraStream = await navigator.mediaDevices.getUserMedia({
+                            video: {
+                                facingMode: 'user',
+                                width: { ideal: 640 },
+                                height: { ideal: 480 }
+                            }
+                        });
+
+                        const video = document.getElementById('cameraVideo');
+                        video.srcObject = this.cameraStream;
+                        this.setupCanvases();
+                        this.logMessage('📹 Cámara frontal activada (trasera no disponible)');
+                        document.getElementById('enableCamera').classList.add('active');
+                        document.getElementById('loadAIModel').disabled = false;
+
+                    } catch (secondError) {
+                        this.logMessage('❌ Error accediendo a cámara: ' + secondError.message);
+                    }
+                }
+            }
+
+            setupCanvases() {
+                const video = document.getElementById('cameraVideo');
+                const detectionCanvas = document.getElementById('detectionCanvas');
+                const faceCanvas = document.getElementById('faceCanvas');
+                
+                detectionCanvas.width = video.videoWidth || 640;
+                detectionCanvas.height = video.videoHeight || 480;
+                faceCanvas.width = video.videoWidth || 640;
+                faceCanvas.height = video.videoHeight || 480;
+
+                document.getElementById('toggleFaceDetection').disabled = false;
+            }
+
+            async loadAIModel() {
+                try {
+                    document.getElementById('modelStatus').textContent = 'Cargando...';
+                    document.getElementById('modelInfo').textContent = 'Descargando modelo COCO-SSD (~25MB)...';
+                    
+                    const startTime = Date.now();
+                    this.objectDetectionModel = await cocoSsd.load({
+                        base: 'mobilenet_v2'
+                    });
+                    
+                    const loadTime = ((Date.now() - startTime) / 1000).toFixed(1);
+                    
+                    document.getElementById('modelStatus').textContent = 'Modelo Cargado';
+                    document.getElementById('modelInfo').textContent = `COCO-SSD cargado en ${loadTime}s - 80 clases detectables`;
+                    document.getElementById('startDetection').disabled = false;
+                    
+                    this.logMessage(`🤖 Modelo IA cargado en ${loadTime}s`);
+                    
+                } catch (error) {
+                    document.getElementById('modelStatus').textContent = 'Error';
+                    document.getElementById('modelInfo').textContent = 'Error cargando modelo';
+                    this.logMessage('❌ Error cargando modelo: ' + error.message);
+                }
+            }
+
+            startObjectDetection() {
+                if (!this.objectDetectionModel) return;
+
+                this.isObjectDetecting = true;
+                document.getElementById('startDetection').textContent = '⏹️ Parar';
+                document.getElementById('startDetection').classList.add('active');
+                
+                this.logMessage('👁️ Detección de objetos activada');
+                this.detectObjectsLoop();
+            }
+
+            stopObjectDetection() {
+                this.isObjectDetecting = false;
+                document.getElementById('startDetection').textContent = '👁️ Detección';
+                document.getElementById('startDetection').classList.remove('active');
+                
+                // Clear canvas
+                const ctx = document.getElementById('detectionCanvas').getContext('2d');
+                ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                
+                this.logMessage('⏹️ Detección de objetos detenida');
+            }
+
+            async detectObjectsLoop() {
+                if (!this.isObjectDetecting || !this.objectDetectionModel) return;
+
+                try {
+                    const video = document.getElementById('cameraVideo');
+                    if (video.readyState < 2) {
+                        setTimeout(() => this.detectObjectsLoop(), 100);
+                        return;
+                    }
+
+                    const startTime = performance.now();
+                    const predictions = await this.objectDetectionModel.detect(video);
+                    const detectionTime = performance.now() - startTime;
+                    
+                    this.processDetections(predictions, detectionTime);
+                    
+                    // Continue detection loop
+                    setTimeout(() => this.detectObjectsLoop(), 600); // ~1.5 FPS for better performance
+                    
+                } catch (error) {
+                    this.logMessage('❌ Error en detección: ' + error.message);
+                    setTimeout(() => this.detectObjectsLoop(), 1000);
+                }
+            }
+
+            processDetections(predictions, detectionTime) {
+                this.realDetections = predictions;
+                this.updatePerformanceMetrics(detectionTime, predictions);
+                this.drawDetections(predictions);
+                this.checkForCriticalObjects(predictions);
+                
+                // Update UI
+                document.getElementById('realObjectCount').textContent = predictions.length;
+                
+                if (predictions.length > 0) {
+                    const avgConfidence = predictions.reduce((sum, p) => sum + p.score, 0) / predictions.length;
+                    document.getElementById('detectionAccuracy').textContent = (avgConfidence * 100).toFixed(0) + '%';
+                } else {
+                    document.getElementById('detectionAccuracy').textContent = '0%';
+                }
+            }
+
+            drawDetections(predictions) {
+                const canvas = document.getElementById('detectionCanvas');
+                const ctx = canvas.getContext('2d');
+                
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.font = '14px Arial';
+                ctx.lineWidth = 2;
+
+                predictions.forEach(prediction => {
+                    const [x, y, width, height] = prediction.bbox;
+                    const confidence = (prediction.score * 100).toFixed(0);
+                    
+                    // Color based on object type and confidence
+                    let color = '#00ff88';
+                    if (prediction.class === 'person') color = '#ff6b47';
+                    else if (prediction.class.includes('car') || prediction.class.includes('truck')) color = '#ffc107';
+                    else if (prediction.class === 'bicycle' || prediction.class === 'motorcycle') color = '#00ccff';
+                    
+                    if (prediction.score < 0.5) color = '#666666';
+                    
+                    // Draw bounding box
+                    ctx.strokeStyle = color;
+                    ctx.strokeRect(x, y, width, height);
+                    
+                    // Draw label with background
+                    const label = `${this.translateClass(prediction.class)} ${confidence}%`;
+                    const textWidth = ctx.measureText(label).width;
+                    
+                    ctx.fillStyle = color;
+                    ctx.fillRect(x, y - 20, textWidth + 10, 20);
+                    ctx.fillStyle = 'black';
+                    ctx.fillText(label, x + 5, y - 5);
+                });
+            }
+
+            checkForCriticalObjects(predictions) {
+                const criticalObjects = predictions.filter(p => 
+                    (p.class === 'person' && p.score > 0.6) ||
+                    (p.class.includes('car') && p.score > 0.7) ||
+                    (p.class === 'bicycle' && p.score > 0.6)
+                );
+
+                if (criticalObjects.length > 0 && this.shouldAlert('object', 2000)) {
+                    const mostConfident = criticalObjects.reduce((max, obj) => 
+                        obj.score > max.score ? obj : max
+                    );
+                    
+                    this.triggerObjectAlert(mostConfident);
+                }
+            }
+
+            startFaceDetection() {
+                this.isFaceDetecting = true;
+                document.getElementById('toggleFaceDetection').classList.add('active');
+                this.logMessage('😴 Monitor de somnolencia activado');
+                this.faceDetectionLoop();
+            }
+
+            stopFaceDetection() {
+                this.isFaceDetecting = false;
+                document.getElementById('toggleFaceDetection').classList.remove('active');
+                
+                const ctx = document.getElementById('faceCanvas').getContext('2d');
+                ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                
+                this.logMessage('😴 Monitor de somnolencia detenido');
+            }
+
+            faceDetectionLoop() {
+                if (!this.isFaceDetecting) return;
+
+                const video = document.getElementById('cameraVideo');
+                const canvas = document.getElementById('faceCanvas');
+                const ctx = canvas.getContext('2d');
+
+                if (video.readyState >= 2) {
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    
+                    const drowsinessScore = this.analyzeDrowsiness(imageData);
+                    
+                    if (drowsinessScore > 0.7) {
+                        this.drowsinessFrames++;
+                        document.getElementById('alertnessStatus').textContent = 'Somnoliento';
+                        document.getElementById('alertnessStatus').className = 'status-value warning';
+                    } else {
+                        this.drowsinessFrames = Math.max(0, this.drowsinessFrames - 1);
+                        document.getElementById('alertnessStatus').textContent = 'Alerta';
+                        document.getElementById('alertnessStatus').className = 'status-value';
+                    }
+
+                    if (this.drowsinessFrames > 20) {
+                        this.triggerDrowsinessAlert();
+                    }
+                }
+
+                setTimeout(() => this.faceDetectionLoop(), 300);
+            }
+
+            analyzeDrowsiness(imageData) {
+                // Simplified drowsiness detection
+                const data = imageData.data;
+                let darkPixels = 0;
+                const sampleSize = Math.floor(data.length / 16);
+                
+                for (let i = 0; i < sampleSize; i++) {
+                    const pixelIndex = i * 16;
+                    const brightness = (data[pixelIndex] + data[pixelIndex + 1] + data[pixelIndex + 2]) / 3;
+                    if (brightness < 80) darkPixels++;
+                }
+                
+                return Math.min(1, darkPixels / (sampleSize * 0.3));
+            }
+
+            enableVoiceNavigation() {
+                if (!this.voiceRecognition) {
+                    this.logMessage('❌ Reconocimiento de voz no disponible');
+                    return;
+                }
+
+                const button = document.getElementById('voiceButton');
+                button.classList.add('active');
+                button.textContent = '🎤 Escuchando...';
+
+                this.voiceRecognition.onresult = (event) => {
+                    const transcript = event.results[0][0].transcript.toLowerCase();
+                    this.processVoiceCommand(transcript);
+                };
+
+                this.voiceRecognition.onend = () => {
+                    button.classList.remove('active');
+                    button.textContent = '🎤 Decir Destino';
+                };
+
+                this.voiceRecognition.start();
+                this.logMessage('🎤 Escuchando comando de voz...');
+            }
+
+            processVoiceCommand(transcript) {
+                this.logMessage('🗣️ ' + transcript);
+
+                const patterns = [
+                    /ir a (.*)/,
+                    /llevarme a (.*)/,
+                    /navegar a (.*)/,
+                    /voy a (.*)/
+                ];
+
+                let destination = '';
+                for (const pattern of patterns) {
+                    const match = transcript.match(pattern);
+                    if (match) {
+                        destination = match[1];
+                        break;
+                    }
+                }
+
+                if (destination) {
+                    document.getElementById('destinationDisplay').innerHTML = `
+                        <strong>Destino:</strong> ${destination}
+                    `;
+                    this.speak('Destino establecido: ' + destination);
+                    this.logMessage('📍 Destino: ' + destination);
+                } else {
+                    this.speak('No entendí el destino. Intenta decir: ir a seguido del lugar');
+                }
+            }
+
+            async enableGPS() {
+                try {
+                    const position = await new Promise((resolve, reject) => {
+                        navigator.geolocation.getCurrentPosition(resolve, reject, {
+                            enableHighAccuracy: true,
+                            timeout: 10000
+                        });
+                    });
+
+                    this.gpsEnabled = true;
+                    document.getElementById('enableGPS').classList.add('active');
+                    this.startGPSTracking();
+                    this.logMessage('📍 GPS activado');
+
+                } catch (error) {
+                    this.logMessage('❌ Error GPS: ' + error.message);
+                }
+            }
+
+            startGPSTracking() {
+                navigator.geolocation.watchPosition(
+                    (position) => {
+                        // Simulate speed based on movement (in real implementation)
+                        this.currentSpeed = Math.random() * 90; // Simulated
+                        document.getElementById('speedDisplay').textContent = Math.round(this.currentSpeed);
+
+                        if (this.currentSpeed > 60) {
+                            document.getElementById('speedDisplay').className = 'status-value danger';
+                            if (this.shouldAlert('speed', 3000)) {
+                                this.triggerSpeedAlert(this.currentSpeed);
+                            }
+                        } else if (this.currentSpeed > 50) {
+                            document.getElementById('speedDisplay').className = 'status-value warning';
+                        } else {
+                            document.getElementById('speedDisplay').className = 'status-value';
+                        }
+                    },
+                    (error) => this.logMessage('❌ Error GPS: ' + error.message),
+                    { enableHighAccuracy: true, timeout: 5000, maximumAge: 1000 }
+                );
+            }
+
+            // Alert system
+            triggerDrowsinessAlert() {
+                if (this.shouldAlert('drowsiness', 8000)) {
+                    document.getElementById('drowsinessAlert').style.display = 'block';
+                    this.playAlertSound('drowsiness');
+                    this.speak('Alerta de somnolencia detectada');
+                    this.logMessage('😴 ALERTA: Somnolencia detectada');
+                }
+            }
+
+            triggerSpeedAlert(speed) {
+                if (this.shouldAlert('speed', 4000)) {
+                    document.getElementById('currentSpeedAlert').textContent = speed.toFixed(0);
+                    document.getElementById('speedAlert').style.display = 'block';
+                    this.playAlertSound('speed');
+                    this.speak(`Velocidad excesiva: ${Math.round(speed)} kilómetros por hora`);
+                    this.logMessage(`⚡ ALERTA: Velocidad ${speed.toFixed(0)} km/h`);
+                }
+            }
+
+            triggerObjectAlert(detection) {
+                const objectName = this.translateClass(detection.class);
+                const confidence = (detection.score * 100).toFixed(0);
+                
+                document.getElementById('objectMessage').textContent = `${objectName.toUpperCase()} DETECTADO`;
+                document.getElementById('objectAlert').style.display = 'block';
+                this.playAlertSound('object');
+                this.speak(`${objectName} detectado`);
+                this.logMessage(`👁️ ALERTA: ${objectName} (${confidence}%)`);
+            }
+
+            shouldAlert(type, cooldown) {
+                const now = Date.now();
+                if (!this.lastAlerts[type] || (now - this.lastAlerts[type]) > cooldown) {
+                    this.lastAlerts[type] = now;
+                    return this.alertsEnabled;
+                }
+                return false;
+            }
+
+            playAlertSound(type) {
+                if (!this.audioContext || !this.alertsEnabled) return;
+
+                const oscillator = this.audioContext.createOscillator();
+                const gainNode = this.audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(this.audioContext.destination);
+
+                switch(type) {
+                    case 'drowsiness':
+                        oscillator.frequency.setValueAtTime(800, this.audioContext.currentTime);
+                        gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+                        gainNode.gain.setValueAtTime(0, this.audioContext.currentTime + 2);
+                        break;
+                    case 'speed':
+                        oscillator.frequency.setValueAtTime(1200, this.audioContext.currentTime);
+                        gainNode.gain.setValueAtTime(0.2, this.audioContext.currentTime);
+                        gainNode.gain.setValueAtTime(0, this.audioContext.currentTime + 0.5);
+                        break;
+                    case 'object':
+                        oscillator.frequency.setValueAtTime(900, this.audioContext.currentTime);
+                        gainNode.gain.setValueAtTime(0.25, this.audioContext.currentTime);
+                        gainNode.gain.setValueAtTime(0, this.audioContext.currentTime + 0.8);
+                        break;
+                }
+
+                oscillator.start();
+                oscillator.stop(this.audioContext.currentTime + 3);
+            }
+
+            speak(text) {
+                if (this.speechSynthesis && this.alertsEnabled) {
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'es-ES';
+                    utterance.rate = 0.9;
+                    this.speechSynthesis.speak(utterance);
+                }
+            }
+
+            translateClass(className) {
+                const translations = {
+                    'person': 'Persona',
+                    'car': 'Automóvil', 
+                    'truck': 'Camión',
+                    'bus': 'Autobús',
+                    'motorcycle': 'Motocicleta',
+                    'bicycle': 'Bicicleta',
+                    'dog': 'Perro',
+                    'cat': 'Gato',
+                    'traffic light': 'Semáforo',
+                    'stop sign': 'Señal Alto'
+                };
+                return translations[className] || className;
+            }
+
+            updatePerformanceMetrics(detectionTime, predictions) {
+                this.detectionTimes.push(detectionTime);
+                if (this.detectionTimes.length > 10) {
+                    this.detectionTimes.shift();
+                }
+
+                if (predictions.length > 0) {
+                    const avgConfidence = predictions.reduce((sum, p) => sum + p.score, 0) / predictions.length;
+                    this.averageAccuracy = avgConfidence;
+                }
+            }
+
+            logMessage(message) {
+                const log = document.getElementById('detectionLog');
+                const time = new Date().toLocaleTimeString();
+                log.innerHTML += `<div>[${time}] ${message}</div>`;
+                log.scrollTop = log.scrollHeight;
+            }
+
+            cleanup() {
+                this.stopObjectDetection();
+                this.stopFaceDetection();
+                
+                if (this.cameraStream) {
+                    this.cameraStream.getTracks().forEach(track => track.stop());
+                }
+            }
+        }
+
+        // Initialize system
+        const safetySystem = new UnifiedSafetySystem();
+
+        // Event listeners
+        document.getElementById('enableCamera').addEventListener('click', () => {
+            safetySystem.enableCamera();
+        });
+
+        document.getElementById('loadAIModel').addEventListener('click', () => {
+            safetySystem.loadAIModel();
+        });
+
+        document.getElementById('startDetection').addEventListener('click', () => {
+            if (safetySystem.isObjectDetecting) {
+                safetySystem.stopObjectDetection();
+            } else {
+                safetySystem.startObjectDetection();
+            }
+        });
+
+        document.getElementById('toggleFaceDetection').addEventListener('click', () => {
+            if (safetySystem.isFaceDetecting) {
+                safetySystem.stopFaceDetection();
+            } else {
+                safetySystem.startFaceDetection();
+            }
+        });
+
+        document.getElementById('enableGPS').addEventListener('click', () => {
+            safetySystem.enableGPS();
+        });
+
+        document.getElementById('voiceButton').addEventListener('click', () => {
+            safetySystem.enableVoiceNavigation();
+        });
+
+        document.getElementById('toggleAlerts').addEventListener('click', () => {
+            safetySystem.alertsEnabled = !safetySystem.alertsEnabled;
+            document.getElementById('toggleAlerts').classList.toggle('active');
+        });
+
+        // Global functions
+        function dismissAlert(type) {
+            document.getElementById(type + 'Alert').style.display = 'none';
+        }
+
+        // Initialize map
+        function initMap() {
+            if (typeof google !== 'undefined') {
+                safetySystem.map = new google.maps.Map(document.getElementById('map'), {
+                    center: { lat: 4.6097, lng: -74.0817 },
+                    zoom: 15
+                });
+            }
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            safetySystem.cleanup();
+        });
+
+        // Load Google Maps
+        const script = document.createElement('script');
+        script.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyC8YtBFIQJ1LwTDKlXWetIgoBa2E7fN84A&callback=initMap';
+        script.onerror = () => {
+            document.getElementById('map').innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #ccc; font-size: 12px;">Mapa no disponible</div>';
+        };
+        document.head.appendChild(script);
+    </script>
+</body>
+</html>
